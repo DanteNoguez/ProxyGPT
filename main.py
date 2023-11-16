@@ -1,9 +1,19 @@
 from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from typing import List
 import time
 import uvicorn
 from config import *
+import openai
+import httpx
+import asyncio
+import os
+from dotenv import load_dotenv
+import json
+import speedscope
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -47,25 +57,33 @@ async def uncaught_exception_handler(request: Request, exc: Exception):
         return Response(content=f"Caught exception: {str(exc)}", status_code=500)
     return Response(content="Internal Server Error", status_code=500)
 
-# Routes
 @app.get("/")
 async def root():
     return {
         "status": True,
     }
 
-@app.post("/v1/completions")
-async def completions(request: Request):
-    # Your implementation for the completions route
-    data = await request.json()
-    return {"result": "Completion result here"}
+async def stream_completion(data, headers):
+    async with httpx.AsyncClient() as client:
+        async with client.stream("POST", "https://api.openai.com/v1/chat/completions", data=json.dumps(data), headers=headers) as response:
+                async for chunk in response.aiter_raw():
+                    if b'[DONE]' in chunk:
+                         break
+                    yield chunk
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
-    # Your implementation for the chat completions route
     data = await request.json()
-    return {"result": "Chat completion result here"}
+    headers = {
+        "Authorization": f"Bearer {get_open_ai_key()}",
+        "Content-Type": "application/json"
+    }
+    if data.get("stream") == True:
+            return StreamingResponse(stream_completion(data, headers), media_type="text/event-stream")
+    else:
+         async with httpx.AsyncClient() as client:
+            response = await client.post("https://api.openai.com/v1/chat/completions", data=json.dumps(data), headers=headers)
+            return response.json()
 
-# Start server
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=SERVER_PORT)
