@@ -5,13 +5,10 @@ from typing import List
 import time
 import uvicorn
 from config import *
-import openai
 import httpx
-import asyncio
 import os
 from dotenv import load_dotenv
 import json
-import speedscope
 
 load_dotenv()
 
