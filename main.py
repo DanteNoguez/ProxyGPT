@@ -9,8 +9,12 @@ import httpx
 import os
 from dotenv import load_dotenv
 import json
+import logging
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 app = FastAPI()
 
@@ -28,7 +32,7 @@ rate_limit = {}
 async def rate_limit_middleware(request: Request, call_next):
     ip = request.client.host
     api_key_used = request.headers.get("Authorization")
-    print(f"API key used: {api_key_used}")
+    #logger.debug(f"API key used: {api_key_used}")
 
     current_time = int(time.time() * 1000)  # Current time in milliseconds
     ip_data = rate_limit.get(ip, {"requests": 0, "lastRequestTime": current_time})

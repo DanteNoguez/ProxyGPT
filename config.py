@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-RATE_LIMIT = 1000 
+RATE_LIMIT = 1 
 PERIOD = 60 * 1000  # Period in milliseconds
 SERVER_PORT = 8081
 DEBUG = True
