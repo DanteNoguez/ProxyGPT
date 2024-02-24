@@ -1,0 +1,19 @@
+services:
+  app:
+    build: .
+    container_name: proxy-gpt
+    ports:
+      - 8081:8081
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=proxy-redis
+      - REDIS_PORT=6379
+    env_file:
+      - .env
+  redis:
+    image: "redis:alpine"
+    command: redis-server --bind 0.0.0.0
+    ports:
+      - 6379:6379
+    container_name: proxy-redis
