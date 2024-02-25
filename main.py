@@ -55,7 +55,7 @@ async def rate_limit_middleware(request: Request, call_next):
         if request.url.path in ["/v1/chat/completions"]:
             api_key = request.headers.get("Authorization").replace("Bearer ", "")
             hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
-            if not await REDIS_DB.rate_limit_check(hashed_key, NUM_MAX_REQUESTS, PERIOD):
+            if not await REDIS_DB.rate_limit_check(hashed_key, MAX_REQUESTS, PERIOD):
                 return Response(content="Too many requests, please try again later", status_code=429)
     response = await call_next(request)
     return response
