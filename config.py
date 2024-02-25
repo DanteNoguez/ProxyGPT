@@ -5,8 +5,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-RATE_LIMIT = 1 
-PERIOD = 60 * 1000  # Period in milliseconds
+RATE_LIMIT = True
+NUM_MAX_REQUESTS = 10  # Number of requests
+PERIOD = 60  # Period in seconds
 SERVER_PORT = 8081
 DEBUG = True
 OPENAI_KEYS = os.getenv('OPENAI_KEYS').split(',')

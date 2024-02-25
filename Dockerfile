@@ -14,6 +14,7 @@ RUN poetry install --no-dev --no-interaction --no-ansi -vvv
 ADD main.py /code/main.py
 ADD config.py /code/config.py
 ADD redis_db.py /code/redis_db.py
+ADD models.py /code/models.py
 
 ENTRYPOINT ["gunicorn"]
 CMD ["-k", "uvicorn.workers.UvicornWorker", "main:app", "-w", "1", "--bind", "0.0.0.0:8081"]
