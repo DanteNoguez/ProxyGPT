@@ -14,10 +14,11 @@ from redis_db import RedisDB
 
 load_dotenv()
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(docs_url="/docs")
+REDIS_DB = RedisDB()
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,9 +32,9 @@ rate_limit = {}
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    ip = request.client.host
-    logger.debug(f"IP: {ip}")
-    api_key_used = request.headers.get("Authorization")
+    #ip = request.client.host
+    #logger.debug(f"IP: {ip}")
+    api_key = request.headers.get("Authorization")
     #logger.debug(f"API key used: {api_key_used}")
 
     # current_time = int(time.time() * 1000)  # Current time in milliseconds
@@ -66,22 +67,33 @@ async def root():
         "status": True,
     }
 
-@app.post("/test")
-async def test(request: Request, name: str):
-    print("Received request")
-    data = await request.json()
-    logger.info(f"Received data: {data}")
+@app.post("/usage")
+async def usage(request: Request):
+    api_key = request.headers.get("Authorization").replace("Bearer ", "")
+    logger.info(f"API key: {api_key}")
+    total_token_usage = await REDIS_DB.get_total_usage(api_key)
     return {
-        "status": True, "data": data, "name": name
+        "total_token_usage": total_token_usage
     }
 
-async def stream_completion(data, headers):
+async def stream_completion(data: dict, headers: dict, api_key: str):
+    content_string = ""
     async with httpx.AsyncClient() as client:
         async with client.stream("POST", "https://api.openai.com/v1/chat/completions", data=json.dumps(data), headers=headers) as response:
-                async for chunk in response.aiter_raw():
-                    if b'[DONE]' in chunk:
-                         break
-                    yield chunk
+            async for chunk in response.aiter_raw():
+                chunk_str = chunk.decode("utf-8").strip()
+                for line in chunk_str.split("\n"):
+                    if line.startswith('data:'):
+                        try:
+                            data_json = json.loads(line[5:])
+                            content = data_json.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            content_string += content
+                        except json.JSONDecodeError:
+                            pass
+                if b'[DONE]' in chunk:
+                    break
+                yield chunk
+    await REDIS_DB.save_request_usage(api_key, len(content_string)/4)
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
@@ -90,24 +102,26 @@ async def chat_completions(request: Request):
         "Authorization": f"Bearer {get_open_ai_key()}",
         "Content-Type": "application/json"
     }
+    api_key = request.headers.get("Authorization").replace("Bearer ", "")
     if data.get("stream") == True:
-            return StreamingResponse(stream_completion(data, headers), media_type="text/event-stream")
+            return StreamingResponse(stream_completion(data, headers, api_key), media_type="text/event-stream")
     else:
-         async with httpx.AsyncClient() as client:
+        cached_response = await REDIS_DB.get_cached_response(json.dumps(data))
+        if cached_response:
+            try:
+                return json.loads(cached_response)
+            except Exception as e:
+                logger.error(f"Error: {e}")
+                pass
+        async with httpx.AsyncClient() as client:
             response = await client.post("https://api.openai.com/v1/chat/completions", data=json.dumps(data), headers=headers)
+            token_usage = response.json().get("usage").get("total_tokens")
+            await REDIS_DB.save_request_usage(api_key, token_usage)
+            await REDIS_DB.cache_request(json.dumps(data), json.dumps(response.text))
             return response.json()
-         
 
 async def startup_event():
     logger.info("Starting up...")
-    # Example Usage
-    tracker = RedisDB()
-    api_key = 'user123'
-    request_data = {'query': 'how to use Redis'}
-    await tracker.save_request_usage(api_key, request_data)
-    request_count = await tracker.get_request_count(api_key)
-    print("Request count for 'user123':", request_count)
-    logger.info("Startup complete")
 
 app.add_event_handler("startup", startup_event)
 

@@ -3,11 +3,15 @@ import json
 import time
 import os
 from dotenv import load_dotenv
+import logging
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 class RedisDB:
     def __init__(self, host=os.getenv('REDIS_HOST', 'localhost'), port=6379, db=0):
         self.redis = aioredis.Redis(host=host, port=port, db=db)
+        self.expire_time = 60*60*24*7 # 1 week
     
     async def save_request_usage(self, api_key, token_usage):
         """Saves the token usage to Redis."""
@@ -30,8 +34,13 @@ class RedisDB:
             total_token_usage += data['token_usage']
         return total_token_usage
     
+    async def get_total_usage(self, api_key):
+        token_usage = await self.get_total_token_usage(api_key)
+        request_count = await self.get_request_count(api_key)
+        return {"token_usage": token_usage, "request_count": request_count}
+    
     async def cache_request(self, request, response):
-        await self.redis.set(request, response)
+        await self.redis.set(request, response, ex=self.expire_time)
 
     async def get_cached_response(self, request):
         return await self.redis.get(request)
