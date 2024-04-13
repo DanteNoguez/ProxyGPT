@@ -1,5 +1,7 @@
 # ProxyGPT
 
+A simple OpenAI API-compatible proxy server designed to provide key management, rate limiting and usage monitoring.
+
 ## Quickstart
 
 Use [ngrok](https://ngrok.com/) to generate a public URL for your local server:
