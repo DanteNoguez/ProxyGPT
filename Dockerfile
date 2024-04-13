@@ -17,4 +17,4 @@ ADD redis_db.py /code/redis_db.py
 ADD models.py /code/models.py
 
 ENTRYPOINT ["gunicorn"]
-CMD ["-k", "uvicorn.workers.UvicornWorker", "main:app", "-w", "1", "--bind", "0.0.0.0:8081"]
+CMD ["-k", "uvicorn.workers.UvicornWorker", "main:app", "-w", "1", "--bind", "0.0.0.0:8080"]

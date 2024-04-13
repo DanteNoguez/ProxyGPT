@@ -27,7 +27,6 @@ class RedisDB:
         return int(count) if count else 0
 
     async def rate_limit_check(self, api_key: str, limit: int, period: int) -> bool:
-        """Checks if the user has exceeded the rate limit within a specific time period."""
         request_list = await self.redis.lrange(f"requests:{api_key}", 0, -1)
         current_time = time.time()
         recent_requests = [json.loads(request) for request in request_list if current_time - json.loads(request)['timestamp'] <= period]
@@ -36,7 +35,6 @@ class RedisDB:
         return True
     
     async def get_total_token_usage(self, api_key: str) -> int:
-        """Returns the total token usage for a given API key."""
         total_token_usage = 0
         request_list = await self.redis.lrange(f"requests:{api_key}", 0, -1)
         for request in request_list:

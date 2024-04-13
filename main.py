@@ -77,8 +77,8 @@ async def generate_key(request: GenerateKey, token: HTTPAuthorizationCredentials
     await REDIS_DB.set(hashed_key, request.username)
     return {"api_key": new_key}
 
-@app.get("/usage")
-async def usage(request: Request, key: HTTPAuthorizationCredentials = Security(validate_key)):
+@app.get("/user_usage")
+async def user_usage(request: Request, key: HTTPAuthorizationCredentials = Security(validate_key)):
     api_key = request.headers.get("Authorization").replace("Bearer ", "")
     hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
     total_token_usage = await REDIS_DB.get_total_usage(hashed_key)
@@ -99,9 +99,10 @@ async def stream_completion(data: dict, headers: dict, api_key: str):
                         except json.JSONDecodeError:
                             pass
                 if b'[DONE]' in chunk:
+                    yield chunk
                     break
                 yield chunk
-    await REDIS_DB.save_request_usage(api_key, len(content_string)/4)
+    await REDIS_DB.save_request_usage(api_key, len(content_string)/4) # 4 chars per token, see https://platform.openai.com/tokenizer
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request, key: HTTPAuthorizationCredentials = Security(validate_key)):
@@ -115,18 +116,10 @@ async def chat_completions(request: Request, key: HTTPAuthorizationCredentials =
     if data.get("stream") == True:
             return StreamingResponse(stream_completion(data, headers, hashed_key), media_type="text/event-stream")
     else:
-        cached_response = await REDIS_DB.get_cached_response(json.dumps(data))
-        if cached_response:
-            try:
-                return json.loads(cached_response)
-            except Exception as e:
-                logger.error(f"Error: {e}")
-                pass
         async with httpx.AsyncClient() as client:
             response = await client.post("https://api.openai.com/v1/chat/completions", data=json.dumps(data), headers=headers)
             token_usage = response.json().get("usage").get("total_tokens")
             await REDIS_DB.save_request_usage(hashed_key, token_usage)
-            await REDIS_DB.cache_request(json.dumps(data), json.dumps(response.text))
             return response.json()
 
 async def startup_event():
