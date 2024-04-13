@@ -4,11 +4,15 @@
 
 Use [ngrok](https://ngrok.com/) to generate a public URL for your local server:
 
-```ngrok http 8080```
+```
+ngrok http 8080
+```
 
-Now, add your `ADMIN_TOKEN` and `OPENAI_API_KEYS` (comma-separated) to your .env. Then, run the application:
+Now, add your `ADMIN_TOKEN` and `OPENAI_API_KEYS` (comma-separated) to your `.env`. Then, run the application:
 
-```docker-compose up --build```
+```
+docker-compose up --build
+```
 
 Use your `ADMIN_TOKEN` to generate a key for a user by requesting it from the `/generate_key` endpoint. Finally, users can start sending requests. Depending on the OpenAI SDK version, requests will look like this:
 
